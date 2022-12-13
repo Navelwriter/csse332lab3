@@ -60,15 +60,6 @@ void setup(void)
   usleep(1000000);
 }
 
-// signal handler
-void sig_handler(int signo)
-{
-  if (signo == SIGALRM)
-  {
-    exit(2);
-  }
-}
-
 /**
  * Run all the test in the test suite.
  */
@@ -76,6 +67,14 @@ void run_all_tests()
 {
   int fd[2];
   pipe(fd);
+  // signal handler
+  void sig_handler(int signo)
+  {
+    if (signo == SIGALRM)
+    {
+      exit(2);
+    }
+  }
   // Create an array of child process IDs, one for each test
   pid_t pids[num_tests];
   signal(SIGALRM, sig_handler);
