@@ -3,11 +3,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define simple_assert(message, test)                                           \
-  do {                                                                         \
-    if(!(test))                                                                \
-      return message;                                                          \
-  } while(0)
+#define simple_assert(message, test) \
+  do                                 \
+  {                                  \
+    if (!(test))                     \
+      return message;                \
+  } while (0)
 #define TEST_PASSED NULL
 #define DATA_SIZE 100
 #define INITIAL_VALUE 77
@@ -28,8 +29,10 @@ static int data[DATA_SIZE][DATA_SIZE];
  *
  * @param test_func A pointer to the function that we would like to run.
  */
-void add_test(char *(*test_func)()) {
-  if(num_tests == MAX_TESTS) {
+void add_test(char *(*test_func)())
+{
+  if (num_tests == MAX_TESTS)
+  {
     printf("exceeded max possible tests");
     exit(1);
   }
@@ -40,17 +43,20 @@ void add_test(char *(*test_func)()) {
 /**
  * This setup function should run before each test
  */
-void setup(void) {
+void setup(void)
+{
   printf("starting setup\n");
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       data[i][j] = INITIAL_VALUE;
     }
   }
 
   /* imagine this function does a lot of other complicated setup that takes a
    * long time. */
-  usleep(3000000);
+  usleep(1000000);
 }
 
 /**
@@ -61,6 +67,8 @@ void run_all_tests()
   // Create an array of child process IDs, one for each test
   pid_t pids[num_tests];
   setup();
+  int fd[2];
+  pipe(fd);
   // Fork a child process for each test
   for (int i = 0; i < num_tests; i++)
   {
@@ -73,18 +81,38 @@ void run_all_tests()
         sleep(3);
         printf("Test timed out\n");
         kill(pid);
-        exit(1);
-      }
-      // This is the child process
-      char *message = test_funcs[i]();
-      if (message == TEST_PASSED)
         exit(0);
-      else{
-        printf("Test failed: %s\n", message);
-        printf("Test crashed\n");
-        exit(1);
       }
+      // checkf or error signal
+      char *message = test_funcs[i]();
+      // get address of test funcs
 
+      if (message == TEST_PASSED)
+      {
+        write(fd[1], message, 1024);
+        kill(pid2);
+        close(fd[1]);
+        exit(0);
+      }
+      else
+      {
+        // check if the test crashed
+        if (message == NULL)
+        {
+          printf("Test failed\n");
+          printf("Crashed\n");
+          kill(pid2);
+          close(fd[1]);
+          exit(1);
+        }
+        else
+        {
+          write(fd[1], message, 1024);
+          kill(pid2);
+          close(fd[1]);
+          exit(1);
+        }
+      }
     }
     else
       // This is the parent process
@@ -94,31 +122,52 @@ void run_all_tests()
   for (int i = 0; i < num_tests; i++)
   {
     int status;
-    waitpid(pids[i], &status, 0);
-    if (WEXITSTATUS(status) == 0)
-      printf("Test %d passed\n", i);
+    pid_t pid1 = waitpid(pids[i], &status, 0);
+    char buffer[1024];
+    int bytes_read = read(fd[0], buffer, 1024);
+    if (pid1 == -1)
+    {
+      printf("Error in waitpid\n");
+      close(fd[0]);
+      exit(1);
+    }
     else
-      printf("Test %d failed\n", i);
+    {
+      if (WEXITSTATUS(status) == 0)
+        printf("Test passed\n");
+      else
+      {
+        printf("Test failed %s\n", buffer);
+      }
+      close(fd[0]);
+    }
   }
 }
 
-char *test1() {
+char *test1()
+{
   printf("starting test 1\n");
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       simple_assert("test 1 data not initialized properly",
                     data[i][j] == INITIAL_VALUE);
     }
   }
 
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       data[i][j] = 1;
     }
   }
 
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       simple_assert("test 1 data not set properly", data[i][j] == 1);
     }
   }
@@ -126,23 +175,30 @@ char *test1() {
   return TEST_PASSED;
 }
 
-char *test2() {
+char *test2()
+{
   printf("starting test 2\n");
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       simple_assert("test 2 data not initialized properly",
                     data[i][j] == INITIAL_VALUE);
     }
   }
 
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       data[i][j] = 2;
     }
   }
 
-  for(int i = 0; i < DATA_SIZE; i++) {
-    for(int j = 0; j < DATA_SIZE; j++) {
+  for (int i = 0; i < DATA_SIZE; i++)
+  {
+    for (int j = 0; j < DATA_SIZE; j++)
+    {
       simple_assert("test 2 data not set properly", data[i][j] == 2);
     }
   }
@@ -151,7 +207,8 @@ char *test2() {
   return TEST_PASSED;
 }
 
-char *test3() {
+char *test3()
+{
   printf("starting test 3\n");
 
   simple_assert("test 3 always fails", 1 == 2);
@@ -160,7 +217,8 @@ char *test3() {
   return TEST_PASSED;
 }
 
-char *test4() {
+char *test4()
+{
   printf("starting test 4\n");
 
   int *val = NULL;
@@ -170,21 +228,23 @@ char *test4() {
   return TEST_PASSED;
 }
 
-char *test5() {
+char *test5()
+{
   printf("starting test 5\n");
 
-  while(1)
+  while (1)
     ;
 
   printf("ending test 5\n");
   return TEST_PASSED;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   add_test(test1);
   add_test(test2);
   add_test(test3);
-  /* add_test(test4); */
-  /* add_test(test5); */
+  // add_test(test4);
+  add_test(test5);
   run_all_tests();
 }
