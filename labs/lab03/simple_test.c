@@ -56,7 +56,50 @@ void setup(void) {
 /**
  * Run all the test in the test suite.
  */
-void run_all_tests() { /* TODO: Add your code here. */
+void run_all_tests()
+{
+  // Create an array of child process IDs, one for each test
+  pid_t pids[num_tests];
+  setup();
+  // Fork a child process for each test
+  for (int i = 0; i < num_tests; i++)
+  {
+    pid_t pid = fork();
+    if (!pid)
+    {
+      pid_t pid2 = fork();
+      if (!pid2)
+      {
+        sleep(3);
+        printf("Test timed out\n");
+        kill(pid);
+        exit(1);
+      }
+      // This is the child process
+      char *message = test_funcs[i]();
+      if (message == TEST_PASSED)
+        exit(0);
+      else{
+        printf("Test failed: %s\n", message);
+        printf("Test crashed\n");
+        exit(1);
+      }
+
+    }
+    else
+      // This is the parent process
+      pids[i] = pid;
+  }
+  // Wait for all child processes to complete
+  for (int i = 0; i < num_tests; i++)
+  {
+    int status;
+    waitpid(pids[i], &status, 0);
+    if (WEXITSTATUS(status) == 0)
+      printf("Test %d passed\n", i);
+    else
+      printf("Test %d failed\n", i);
+  }
 }
 
 char *test1() {
