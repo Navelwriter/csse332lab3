@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define simple_assert(message, test) \
   do                                 \
@@ -59,65 +60,57 @@ void setup(void)
   usleep(1000000);
 }
 
+// signal handler
+void sig_handler(int signo)
+{
+  if (signo == SIGALRM)
+  {
+    exit(2);
+  }
+}
+
 /**
  * Run all the test in the test suite.
  */
 void run_all_tests()
 {
-  // Create an array of child process IDs, one for each test
-  pid_t pids[num_tests];
-  setup();
   int fd[2];
   pipe(fd);
+  // Create an array of child process IDs, one for each test
+  pid_t pids[num_tests];
+  signal(SIGALRM, sig_handler);
+  setup();
   // Fork a child process for each test
   for (int i = 0; i < num_tests; i++)
   {
     pid_t pid = fork();
     if (!pid)
     {
-      pid_t pid2 = fork();
-      if (!pid2)
-      {
-        sleep(3);
-        printf("Test timed out\n");
-        kill(pid);
-        exit(0);
-      }
+      alarm(3);
       // checkf or error signal
       char *message = test_funcs[i]();
-      // get address of test funcs
+      // check if message WIFEXITED to see if test crashed
 
       if (message == TEST_PASSED)
       {
         write(fd[1], message, 1024);
-        kill(pid2);
         close(fd[1]);
         exit(0);
       }
+
       else
       {
-        // check if the test crashed
-        if (message == NULL)
-        {
-          printf("Test failed\n");
-          printf("Crashed\n");
-          kill(pid2);
-          close(fd[1]);
-          exit(1);
-        }
-        else
-        {
-          write(fd[1], message, 1024);
-          kill(pid2);
-          close(fd[1]);
-          exit(1);
-        }
+        write(fd[1], message, 1024);
+        close(fd[1]);
+        exit(1);
       }
     }
+
     else
       // This is the parent process
       pids[i] = pid;
   }
+
   // Wait for all child processes to complete
   for (int i = 0; i < num_tests; i++)
   {
@@ -125,22 +118,21 @@ void run_all_tests()
     pid_t pid1 = waitpid(pids[i], &status, 0);
     char buffer[1024];
     int bytes_read = read(fd[0], buffer, 1024);
-    if (pid1 == -1)
+    // clear buffer
+    buffer[bytes_read] = '\0';
+    if (WIFEXITED(status) == 0)
     {
-      printf("Error in waitpid\n");
-      close(fd[0]);
-      exit(1);
+      printf("Test failed: Crashed\n");
     }
+    else if (WEXITSTATUS(status) == 0)
+      printf("Test passed\n");
+    else if (WEXITSTATUS(status) == 2)
+      printf("Test failed: Time out\n");
     else
     {
-      if (WEXITSTATUS(status) == 0)
-        printf("Test passed\n");
-      else
-      {
-        printf("Test failed %s\n", buffer);
-      }
-      close(fd[0]);
+      printf("Test failed %s\n", buffer);
     }
+    close(fd[0]);
   }
 }
 
@@ -244,7 +236,7 @@ int main(int argc, char **argv)
   add_test(test1);
   add_test(test2);
   add_test(test3);
-  // add_test(test4);
+  add_test(test4);
   add_test(test5);
   run_all_tests();
 }
